@@ -2,13 +2,15 @@ import jwt from "jsonwebtoken";
 import db from "../config/db.js";
 import { configDotenv } from "dotenv";
 import {
-    generateAccessToken,
+    generateToken,
     generateHashedPassword,
     isPasswordCorrect,
+    verifyToken,
 } from "../helper/helper.js";
 import { asyncHandler } from "../helper/asyncHandler.js";
 import { ApiError } from "../helper/apiError.js";
 import { ApiResponse } from "../helper/apiResponse.js";
+import { sendResetPasswordLink } from "../helper/sendMail.js";
 
 configDotenv();
 
@@ -40,7 +42,7 @@ export const registerUser = asyncHandler(async (req, res) => {
         [fullname, email, username, hashedPassword]
     );
 
-    const token = generateAccessToken(results.insertId, email);
+    const token = generateToken(email, "2d");
 
     const data = {
         userId: results.insertId,
@@ -73,7 +75,7 @@ export const loginUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Invalid Credentials");
     }
 
-    const token = generateAccessToken(id, email);
+    const token = generateToken(email, "2d");
 
     const data = {
         userId: id,
@@ -101,7 +103,40 @@ export const verifyEmail = asyncHandler(async (req, res) => {
         throw new ApiError(400, "User doesn't exist with this email");
     }
 
+    await sendResetPasswordLink(email);
 
-    
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {},
+                `Email has been sent to your email ${email}`
+            )
+        );
+});
 
+export const resetPassword = asyncHandler(async (req, res) => {
+    const { token } = req.query;
+    const { newpassword } = req.body;
+
+    if ([newpassword].some((field) => !field || field.trim() === "")) {
+        throw new ApiError(400, "New Password required");
+    }
+    const isValid = verifyToken(token);
+
+    if (!isValid.valid) {
+        throw new ApiError(400, isValid.message);
+    }
+
+    const { email } = isValid.decoded;
+    const hashedPassword = generateHashedPassword(newpassword);
+    const result = await db.query(
+        "UPDATE users set password = ? WHERE email = ?",
+        [hashedPassword, email]
+    );
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "Your password has been changed"));
 });

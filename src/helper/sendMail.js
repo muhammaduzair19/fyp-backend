@@ -1,26 +1,40 @@
 import nodemailer from "nodemailer";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { generateToken } from "./helper.js";
 
-export const sendResetPasswordLink = () =>   {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const templatePath = path.join(__dirname, "../../public/reset-email.html");
+let htmlTemplate = fs.readFileSync(templatePath, "utf-8");
+
+export const sendResetPasswordLink = async (userEmail) => {
     const transporter = nodemailer.createTransport({
-        host: "gmail",
+        host: "smtp.gmail.com",
         secure: false, // true for port 465, false for other ports
         auth: {
-            user: "maddison53@ethereal.email",
-            pass: "jn7jnAPss4f63QBp6D",
+            user: "muhammaduzairilyas@gmail.com",
+            pass: "lcsf kleb eipw fezi",
         },
     });
-    // async..await is not allowed in global scope, must use a wrapper
-    async function main() {
-        // send mail with defined transport object
+
+    const token = generateToken(userEmail, "1hr");
+    const resetLink = `https://localhost:5173/reset-password/token=${token}`;
+    htmlTemplate = htmlTemplate.replace(/{{reset_link}}/g, resetLink);
+
+    try {
         const info = await transporter.sendMail({
-            from: '"Maddison Foo Koch :ghost:" <maddison53@ethereal.email>', // sender address
-            to: "bar@example.com, baz@example.com", // list of receivers
-            subject: "Hello :heavy_check_mark:", // Subject line
-            text: "Hello world?", // plain text body
-            html: "<b>Hello world?</b>", // html body
+            from: "muhammaduzairilyas@gmail.com",
+            to: userEmail,
+            subject: "Reset Password Link",
+            text: "Hello world?",
+            html: htmlTemplate,
         });
         console.log("Message sent: %s", info.messageId);
-        // Message sent: <d786aa62-4e0a-070a-47ed-0b0666549519@ethereal.email>
+    } catch (error) {
+        console.log(error);
     }
-    main().catch(console.error);
 };
+
+
